@@ -78,7 +78,6 @@ def _parse_or_report(source: str) -> tuple[Node | None, int]:
 def run(
     words: tuple[str, ...],
     target: str | None,
-    create: bool,
     dry_run: bool,
     verbose: bool,
 ) -> int:
@@ -115,7 +114,8 @@ def run(
         if not dry_run:
             window = tmux.load_panes(server, window)
             short = wanted - window.pane_count
-            if short != 0 and not (create and short > 0):
+            # Missing panes are split off below; surplus ones are never killed.
+            if short < 0:
                 raise CountMismatch(
                     f"layout needs {wanted} panes, window has {window.pane_count}"
                 )
@@ -163,15 +163,13 @@ def run(
 @click.argument("words", nargs=-1)
 @click.option("-t", "target", metavar="<target>", default=None,
               help="Target window, in tmux target-window form.")
-@click.option("-c", "--create", is_flag=True,
-              help="Split to create missing panes instead of failing.")
 @click.option("-n", "--dry-run", is_flag=True,
               help="Print an ASCII diagram of the layout without applying it.")
 @click.option("-v", "--verbose", is_flag=True,
               help="Report the parsed tree and the computed cell geometry.")
 @click.version_option(__version__, "-V", "--version", prog_name="lay")
-def cli(words, target, create, dry_run, verbose):
-    raise SystemExit(run(words, target, create, dry_run, verbose))
+def cli(words, target, dry_run, verbose):
+    raise SystemExit(run(words, target, dry_run, verbose))
 
 
 def main() -> None:

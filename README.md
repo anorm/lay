@@ -187,17 +187,19 @@ number  = ? decimal > 0 ?  ;
 
 ## Pane count and pane order
 
-`lay` never creates or destroys panes by default. It first counts the leaves in
-the expression and compares that to the number of panes in the target window.
-If they differ, nothing is changed and `lay` exits with status 2:
+`lay` counts the leaves in the expression and compares that to the number of
+panes in the target window. If the layout asks for more panes than the window
+has, `lay` splits off the missing ones before arranging them.
+
+Panes are never destroyed. If the layout asks for *fewer* panes than the window
+has, nothing is changed and `lay` exits with status 2:
 
 ```
-$ lay '1 1 1'
-lay: layout needs 3 panes, window has 2
+$ lay '1 1'
+lay: layout needs 2 panes, window has 3
 ```
 
-Use `-c` / `--create` to let `lay` split off the missing panes first. Extra
-panes are never killed — that always stays an explicit `kill-pane`.
+Closing a pane always stays an explicit `kill-pane`.
 
 `-n` / `--dry-run` skips this check entirely. A dry run only draws the shape
 you asked for, so it neither counts nor touches the window's panes and can
@@ -216,7 +218,7 @@ lay '1 / 1 2'
 ```
 
 Panes therefore keep their tmux indices and only move on screen. If you want a
-pane somewhere else, use `swap-pane`, or `lay -c` after `break-pane`.
+pane somewhere else, use `swap-pane`, or `lay` after `break-pane`.
 
 ## Editing the current layout
 
@@ -247,13 +249,9 @@ parentheses are dropped, so `(4 4) / 1` comes back as `(1 1) / 1` and
 `(1 / 1) 2` as `1 / 1 2`. It describes exactly the same layout.
 
 Panes are matched to leaves in the usual order, so editing only the weights
-moves the boundaries and leaves every pane where it is. Adding or removing a
-leaf changes the pane count, which is an ordinary mismatch — combine with `-c`
-to have the missing panes split off for you:
-
-```sh
-lay -c
-```
+moves the boundaries and leaves every pane where it is. Adding a leaf splits
+off a new pane for it; removing one is a mismatch, since `lay` will not close
+a pane for you.
 
 Layouts tmux built for itself (a mouse drag, or `select-layout tiled`) may have
 no simple ratio behind them. Those still decode correctly, but the weights come
@@ -264,7 +262,6 @@ back as raw cell counts, so expect `89 88` rather than `1 1`.
 | Option              | Description                                                     |
 | ------------------- | --------------------------------------------------------------- |
 | `-t <target>`       | Target window, in tmux `target-window` form. Defaults to current. |
-| `-c`, `--create`    | Split to create missing panes instead of failing.                 |
 | `-n`, `--dry-run`   | Print an ASCII diagram of the layout and exit without applying.   |
 | `-v`, `--verbose`   | Report the parsed tree and the computed cell geometry.            |
 | `-h`, `--help`      | Show usage.                                                       |
@@ -276,7 +273,7 @@ back as raw cell counts, so expect `89 88` rather than `1 1`.
 | ---- | ------------------------------------------------------------ |
 | `0`  | Layout applied.                                              |
 | `1`  | Usage error, the layout failed to parse, or the edit was abandoned. |
-| `2`  | Pane count mismatch.                                         |
+| `2`  | Layout asks for fewer panes than the window has.             |
 | `3`  | Layout does not fit — a pane would be smaller than 1 cell.   |
 | `4`  | tmux is unavailable, the target window does not exist, or its layout could not be read. |
 

@@ -8,7 +8,6 @@ from lay.cli import run
 def call(words, **kwargs):
     options = {
         "target": None,
-        "create": False,
         "dry_run": False,
         "verbose": False,
     }

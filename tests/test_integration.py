@@ -102,7 +102,6 @@ def invoke(args: list[str]) -> int:
     return run(
         words,
         target=None,
-        create="-c" in flags,
         dry_run="-n" in flags,
         verbose="-v" in flags,
     )
@@ -140,7 +139,7 @@ LAYOUTS = [
 def test_applied_layout_is_byte_identical_to_what_lay_renders(tmux_server, layout):
     """Our layout string must match tmux's own dump exactly, checksum included."""
     tmux_server.reset()
-    assert invoke(["-c", layout]) == 0
+    assert invoke([layout]) == 0
 
     applied = tmux_server.layout
     pane_ids = tmux_server.tmux("list-panes", "-F", "#{pane_id}").splitlines()
@@ -153,35 +152,42 @@ def test_applied_layout_is_byte_identical_to_what_lay_renders(tmux_server, layou
 def test_applied_geometry_survives_a_round_trip(tmux_server, layout):
     """Whatever tmux reports back must describe the geometry we asked for."""
     tmux_server.reset()
-    assert invoke(["-c", layout]) == 0
+    assert invoke([layout]) == 0
     expected = render(build(parse(layout), WIDTH, HEIGHT))
     assert normalise(tmux_server.layout) == normalise(expected)
 
 
-def test_pane_count_mismatch_exits_2(tmux_server, capsys):
+def test_surplus_panes_exit_2(tmux_server, capsys):
     tmux_server.reset()
-    assert invoke(["1 1 1"]) == 2
-    assert "layout needs 3 panes, window has 1" in capsys.readouterr().err
+    assert invoke(["1 1 1"]) == 0
+    assert invoke(["1 1"]) == 2
+    assert "layout needs 2 panes, window has 3" in capsys.readouterr().err
 
 
 def test_extra_panes_are_never_killed(tmux_server, capsys):
     tmux_server.reset()
-    assert invoke(["-c", "1 1 1"]) == 0
+    assert invoke(["1 1 1"]) == 0
     # Asking for fewer panes is a mismatch, not a licence to kill.
-    assert invoke(["-c", "1 1"]) == 2
+    assert invoke(["1 1"]) == 2
     assert tmux_server.pane_count == 3
 
 
-def test_create_makes_exactly_the_missing_panes(tmux_server):
+def test_missing_panes_are_created_by_default(tmux_server):
     tmux_server.reset()
-    assert invoke(["-c", "3:(1 / 1 / 1) 1"]) == 0
+    assert invoke(["1 1 1"]) == 0
+    assert tmux_server.pane_count == 3
+
+
+def test_exactly_the_missing_panes_are_made(tmux_server):
+    tmux_server.reset()
+    assert invoke(["3:(1 / 1 / 1) 1"]) == 0
     assert tmux_server.pane_count == 4
 
 
 def test_unfittable_layout_creates_nothing(tmux_server, capsys):
     tmux_server.reset()
     huge = " ".join(["1"] * 200)
-    assert invoke(["-c", huge]) == 3
+    assert invoke([huge]) == 3
     assert "does not fit" in capsys.readouterr().err
     # The window must be untouched.
     assert tmux_server.pane_count == 1
@@ -190,7 +196,7 @@ def test_unfittable_layout_creates_nothing(tmux_server, capsys):
 def test_dry_run_does_not_touch_the_window(tmux_server, capsys):
     tmux_server.reset()
     before = tmux_server.layout
-    assert invoke(["-c", "-n", "1 1 1"]) == 0
+    assert invoke(["-n", "1 1 1"]) == 0
     assert capsys.readouterr().out.strip()
     assert tmux_server.layout == before
     assert tmux_server.pane_count == 1
@@ -226,7 +232,7 @@ def test_dry_run_reads_only_the_window_size(tmux_server, capsys, monkeypatch):
     monkeypatch.setattr(lay_tmux, "apply", forbidden)
 
     tmux_server.reset()
-    assert invoke(["-c", "-n", "1 1 1"]) == 0
+    assert invoke(["-n", "1 1 1"]) == 0
     assert capsys.readouterr().out.strip()
 
 
@@ -246,7 +252,7 @@ def test_dry_run_scales_the_diagram_to_a_readable_width(tmux_server, capsys):
 
 def test_panes_keep_their_indices_and_only_move(tmux_server):
     tmux_server.reset()
-    assert invoke(["-c", "1 1 1"]) == 0
+    assert invoke(["1 1 1"]) == 0
     before = tmux_server.tmux("list-panes", "-F", "#{pane_id}").splitlines()
     assert invoke(["1 / 1 / 1"]) == 0
     after = tmux_server.tmux("list-panes", "-F", "#{pane_id}").splitlines()
@@ -256,7 +262,7 @@ def test_panes_keep_their_indices_and_only_move(tmux_server):
 def test_nth_leaf_gets_nth_pane(tmux_server):
     """'1 / 1 2' must stack panes 0 and 1 on the left, pane 2 on the right."""
     tmux_server.reset()
-    assert invoke(["-c", "1 / 1 2"]) == 0
+    assert invoke(["1 / 1 2"]) == 0
     rows = tmux_server.tmux(
         "list-panes", "-F", "#{pane_index} #{pane_left} #{pane_top} #{pane_width}"
     ).splitlines()
@@ -301,7 +307,7 @@ def test_edit_is_seeded_with_the_current_layout(
 ):
     """What the editor opens must describe the window as it actually is."""
     tmux_server.reset()
-    assert invoke(["-c", layout]) == 0
+    assert invoke([layout]) == 0
     before = tmux_server.layout
 
     seen = tmp_path / "seen"
@@ -315,7 +321,7 @@ def test_edit_is_seeded_with_the_current_layout(
 
 def test_edit_applies_the_edited_layout(tmux_server, scripted_editor):
     tmux_server.reset()
-    assert invoke(["-c", "1 1 1"]) == 0
+    assert invoke(["1 1 1"]) == 0
     scripted_editor("1 / 1 / 1\n")
     assert invoke([]) == 0
 
@@ -325,7 +331,7 @@ def test_edit_applies_the_edited_layout(tmux_server, scripted_editor):
 
 def test_edit_without_changes_does_nothing(tmux_server, scripted_editor, capsys):
     tmux_server.reset()
-    assert invoke(["-c", "1 2"]) == 0
+    assert invoke(["1 2"]) == 0
     before = tmux_server.layout
     scripted_editor(None)          # editor leaves the buffer untouched
     assert invoke([]) == 0
@@ -340,21 +346,21 @@ def test_edit_reports_a_bad_expression(tmux_server, scripted_editor, capsys):
     assert "unexpected character" in capsys.readouterr().err
 
 
-def test_edit_that_changes_pane_count_is_a_mismatch(
+def test_edit_that_removes_a_leaf_is_a_mismatch(
     tmux_server, scripted_editor, capsys
 ):
     tmux_server.reset()
-    assert invoke(["-c", "1 1"]) == 0
-    scripted_editor("1 1 1 1\n")
+    assert invoke(["1 1 1"]) == 0
+    scripted_editor("1 1\n")
     assert invoke([]) == 2
-    assert "layout needs 4 panes, window has 2" in capsys.readouterr().err
+    assert "layout needs 2 panes, window has 3" in capsys.readouterr().err
 
 
-def test_edit_can_create_panes_with_c(tmux_server, scripted_editor):
+def test_edit_that_adds_a_leaf_creates_the_pane(tmux_server, scripted_editor):
     tmux_server.reset()
-    assert invoke(["-c", "1 1"]) == 0
+    assert invoke(["1 1"]) == 0
     scripted_editor("1 1 1 1\n")
-    assert invoke(["-c"]) == 0
+    assert invoke([]) == 0
     assert tmux_server.pane_count == 4
 
 
@@ -362,7 +368,7 @@ def test_edit_aborts_when_the_buffer_is_emptied(
     tmux_server, scripted_editor, capsys
 ):
     tmux_server.reset()
-    assert invoke(["-c", "1 2"]) == 0
+    assert invoke(["1 2"]) == 0
     before = tmux_server.layout
     scripted_editor("\n")
     assert invoke([]) == 1
@@ -413,7 +419,7 @@ def test_edit_dry_run_previews_without_applying(
     tmux_server, scripted_editor, capsys
 ):
     tmux_server.reset()
-    assert invoke(["-c", "1 1"]) == 0
+    assert invoke(["1 1"]) == 0
     before = tmux_server.layout
     scripted_editor("1 / 1\n")
     assert invoke(["-n"]) == 0
