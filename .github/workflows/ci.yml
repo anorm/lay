@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: ruff + pyright
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # setup-uv publishes no floating major tag past v7, so pin the full version.
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - run: uv sync --locked
+
+      - name: ruff
+        run: uv run ruff check --output-format=github
+
+      - name: pyright
+        run: uv run pyright
+
+  test:
+    name: py${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          # tmux is the system under test, so a second tmux build is worth a
+          # leg: the integration suite compares layout strings byte-for-byte
+          # and those can differ between tmux versions.
+          - os: macos-latest
+            python-version: "3.13"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install tmux (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tmux
+
+      - name: Install tmux (macOS)
+        if: runner.os == 'macOS'
+        run: brew list tmux >/dev/null 2>&1 || brew install tmux
+
+      # tests/test_integration.py carries a module-level
+      # `skipif(shutil.which("tmux") is None)`, so a missing tmux would drop
+      # the whole integration suite from an otherwise green build. Fail here
+      # instead.
+      - name: Verify tmux is available
+        run: tmux -V
+
+      # setup-uv publishes no floating major tag past v7, so pin the full version.
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - run: uv sync --locked
+
+      - name: Unit tests
+        run: uv run pytest --ignore=tests/test_integration.py -ra
+
+      - name: Integration tests (real tmux server)
+        run: uv run pytest tests/test_integration.py -ra

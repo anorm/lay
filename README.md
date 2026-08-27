@@ -1,5 +1,7 @@
 # lay
 
+[![CI](https://github.com/anorm/lay/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/anorm/lay/actions/workflows/ci.yml)
+
 `lay` is a command line tool for controlling the layout of panes in the current
 tmux window using a short, declarative expression.
 
