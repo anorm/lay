@@ -24,6 +24,8 @@ dev:
 	uv sync
 
 test: dev
+	uv run ruff check
+	uv run pyright
 	uv run pytest -q
 
 lint: dev
