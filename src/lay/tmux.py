@@ -113,7 +113,7 @@ def current_layout(server: Server, window: Window) -> str:
     """Read the window's current tmux layout string.
 
     Kept out of :func:`measure` on purpose: a dry run must issue exactly one
-    tmux command, and only ``--edit`` needs this one.
+    tmux command, and only the editing path needs this one.
     """
     lines = _run(
         server, "display-message", "-p", "-t", window.target, "#{window_layout}"

@@ -34,7 +34,7 @@ uv tool install git+https://github.com/anorm/lay
 ## Usage
 
 ```
-lay [options] <layout>
+lay [options] [<layout>]
 ```
 
 The layout is a single argument, so it normally needs quoting:
@@ -51,6 +51,9 @@ lay '1 1 1'
 lay 1 1 1
 lay "1  1   1"
 ```
+
+With no layout at all, `lay` opens the window's current one in `$EDITOR`. See
+[Editing the current layout](#editing-the-current-layout).
 
 ## The layout language
 
@@ -217,12 +220,13 @@ pane somewhere else, use `swap-pane`, or `lay -c` after `break-pane`.
 
 ## Editing the current layout
 
-`lay -e` reads the window's existing arrangement, turns it back into a layout
-expression, and opens it in `$EDITOR` (or `$VISUAL`, else `vi`). Save and exit
-and the result is applied; quit without saving and nothing changes.
+Run with no layout argument and `lay` reads the window's existing arrangement,
+turns it back into a layout expression, and opens it in `$EDITOR` (or
+`$VISUAL`, else `vi`). Save and exit and the result is applied; quit without
+saving and nothing changes.
 
 ```sh
-lay -e
+lay
 ```
 
 ```
@@ -233,7 +237,7 @@ lay -e
 ```
 
 Nothing is stored on the window to make this work — the expression is
-reconstructed from `#{window_layout}` every time. That means `-e` works on
+reconstructed from `#{window_layout}` every time. That means it works on
 windows `lay` has never touched, survives a tmux server restart, and can never
 disagree with what is actually on screen.
 
@@ -248,7 +252,7 @@ leaf changes the pane count, which is an ordinary mismatch — combine with `-c`
 to have the missing panes split off for you:
 
 ```sh
-lay -c -e
+lay -c
 ```
 
 Layouts tmux built for itself (a mouse drag, or `select-layout tiled`) may have
@@ -262,7 +266,6 @@ back as raw cell counts, so expect `89 88` rather than `1 1`.
 | `-t <target>`       | Target window, in tmux `target-window` form. Defaults to current. |
 | `-c`, `--create`    | Split to create missing panes instead of failing.                 |
 | `-n`, `--dry-run`   | Print an ASCII diagram of the layout and exit without applying.   |
-| `-e`, `--edit`      | Edit the window's current layout in `$EDITOR`.                    |
 | `-v`, `--verbose`   | Report the parsed tree and the computed cell geometry.            |
 | `-h`, `--help`      | Show usage.                                                       |
 | `-V`, `--version`   | Show version.                                                     |
@@ -303,7 +306,7 @@ Under `-n` the work stops after the geometry is computed: `lay` measures the
 window, draws the diagram, and returns. That one `display-message` is the only
 tmux command a dry run issues — it never lists panes, splits, or applies.
 
-`-e` runs the same machinery backwards first. It reads `#{window_layout}`,
+Editing runs the same machinery backwards first. It reads `#{window_layout}`,
 parses the tree tmux stores there, and recovers each split's weights by
 searching for the simplest integers that reproduce the recorded cell sizes
 exactly — which is how `89` and `88` columns become `1 1` again. The expression
@@ -320,6 +323,6 @@ lay '1 / 1 / 1'          # three equal rows
 lay '(2 1) / 1'          # 2:1 columns on top, full-width row below
 lay '3:(1 / 1 / 1) 1'    # tall three-row column at 75%, sidebar at 25%
 lay -n '1 2 1'           # preview the layout without applying it
-lay -e                   # edit the current layout in $EDITOR
+lay                      # edit the current layout in $EDITOR
 lay -t dev:2 '1 1'       # target another window
 ```

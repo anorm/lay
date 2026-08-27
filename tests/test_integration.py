@@ -103,7 +103,6 @@ def invoke(args: list[str]) -> int:
         target=None,
         create="-c" in flags,
         dry_run="-n" in flags,
-        edit="-e" in flags,
         verbose="-v" in flags,
     )
 
@@ -268,7 +267,7 @@ def test_nth_leaf_gets_nth_pane(tmux_server):
 
 
 # --------------------------------------------------------------------------
-# --edit
+# editing (no layout argument)
 # --------------------------------------------------------------------------
 
 
@@ -306,7 +305,7 @@ def test_edit_is_seeded_with_the_current_layout(
 
     seen = tmp_path / "seen"
     scripted_editor(None, record=seen)
-    assert invoke(["-e"]) == 0
+    assert invoke([]) == 0
 
     seeded = strip_comments(seen.read_text())
     # The seeded expression must reproduce the live layout exactly.
@@ -317,7 +316,7 @@ def test_edit_applies_the_edited_layout(tmux_server, scripted_editor):
     tmux_server.reset()
     assert invoke(["-c", "1 1 1"]) == 0
     scripted_editor("1 / 1 / 1\n")
-    assert invoke(["-e"]) == 0
+    assert invoke([]) == 0
 
     expected = render(build(parse("1 / 1 / 1"), WIDTH, HEIGHT))
     assert normalise(tmux_server.layout) == normalise(expected)
@@ -328,7 +327,7 @@ def test_edit_without_changes_does_nothing(tmux_server, scripted_editor, capsys)
     assert invoke(["-c", "1 2"]) == 0
     before = tmux_server.layout
     scripted_editor(None)          # editor leaves the buffer untouched
-    assert invoke(["-e"]) == 0
+    assert invoke([]) == 0
     assert tmux_server.layout == before
     assert "unchanged" in capsys.readouterr().err
 
@@ -336,7 +335,7 @@ def test_edit_without_changes_does_nothing(tmux_server, scripted_editor, capsys)
 def test_edit_reports_a_bad_expression(tmux_server, scripted_editor, capsys):
     tmux_server.reset()
     scripted_editor("1 & 1\n")
-    assert invoke(["-e"]) == 1
+    assert invoke([]) == 1
     assert "unexpected character" in capsys.readouterr().err
 
 
@@ -346,7 +345,7 @@ def test_edit_that_changes_pane_count_is_a_mismatch(
     tmux_server.reset()
     assert invoke(["-c", "1 1"]) == 0
     scripted_editor("1 1 1 1\n")
-    assert invoke(["-e"]) == 2
+    assert invoke([]) == 2
     assert "layout needs 4 panes, window has 2" in capsys.readouterr().err
 
 
@@ -354,7 +353,7 @@ def test_edit_can_create_panes_with_c(tmux_server, scripted_editor):
     tmux_server.reset()
     assert invoke(["-c", "1 1"]) == 0
     scripted_editor("1 1 1 1\n")
-    assert invoke(["-c", "-e"]) == 0
+    assert invoke(["-c"]) == 0
     assert tmux_server.pane_count == 4
 
 
@@ -365,15 +364,9 @@ def test_edit_aborts_when_the_buffer_is_emptied(
     assert invoke(["-c", "1 2"]) == 0
     before = tmux_server.layout
     scripted_editor("\n")
-    assert invoke(["-e"]) == 1
+    assert invoke([]) == 1
     assert "empty layout" in capsys.readouterr().err
     assert tmux_server.layout == before
-
-
-def test_edit_rejects_a_layout_argument(tmux_server, capsys):
-    tmux_server.reset()
-    assert invoke(["-e", "1 1"]) == 1
-    assert "takes no layout argument" in capsys.readouterr().err
 
 
 def test_edit_works_on_a_window_lay_never_touched(tmux_server, scripted_editor):
@@ -385,7 +378,7 @@ def test_edit_works_on_a_window_lay_never_touched(tmux_server, scripted_editor):
     before = tmux_server.layout
 
     scripted_editor(None)
-    assert invoke(["-e"]) == 0
+    assert invoke([]) == 0
     # Untouched by an empty edit, and decodable without error.
     assert tmux_server.layout == before
 
@@ -422,6 +415,6 @@ def test_edit_dry_run_previews_without_applying(
     assert invoke(["-c", "1 1"]) == 0
     before = tmux_server.layout
     scripted_editor("1 / 1\n")
-    assert invoke(["-e", "-n"]) == 0
+    assert invoke(["-n"]) == 0
     assert "┌" in capsys.readouterr().out
     assert tmux_server.layout == before

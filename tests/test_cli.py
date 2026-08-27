@@ -10,23 +10,24 @@ def call(words, **kwargs):
         "target": None,
         "create": False,
         "dry_run": False,
-        "edit": False,
         "verbose": False,
     }
     options.update(kwargs)
     return run(tuple(words), **options)
 
 
-def test_no_layout_is_a_usage_error(capsys):
-    assert call([]) == 1
-    err = capsys.readouterr().err
-    assert "no layout given" in err
-    assert "usage:" in err
+def test_no_layout_edits_the_current_one(capsys, monkeypatch):
+    """With nothing to parse, `lay` goes straight to the editor path."""
+    monkeypatch.delenv("TMUX", raising=False)
+    # Exit 4 from tmux, not a usage error, which proves it took the edit path.
+    assert call([]) == 4
+    assert "not inside a tmux session" in capsys.readouterr().err
 
 
-def test_blank_layout_is_a_usage_error(capsys):
-    assert call(["  "]) == 1
-    assert "no layout given" in capsys.readouterr().err
+def test_blank_layout_edits_the_current_one(capsys, monkeypatch):
+    monkeypatch.delenv("TMUX", raising=False)
+    assert call(["  "]) == 4
+    assert "not inside a tmux session" in capsys.readouterr().err
 
 
 def test_parse_error_exits_1_with_a_caret(capsys):

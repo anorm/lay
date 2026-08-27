@@ -78,18 +78,12 @@ def run(
     target: str | None,
     create: bool,
     dry_run: bool,
-    edit: bool,
     verbose: bool,
 ) -> int:
     source = " ".join(words).strip()
 
-    if edit and source:
-        _fail("-e takes no layout argument; it edits the current one")
-        return 1
-    if not edit and not source:
-        _fail("no layout given")
-        click.echo("usage: lay [options] <layout>", err=True)
-        return 1
+    # No layout means edit the window's current one in $EDITOR.
+    edit = not source
 
     tree = None
     if not edit:
@@ -158,7 +152,9 @@ def run(
 @click.command(
     context_settings={"help_option_names": ["-h", "--help"]},
     help="Arrange the panes of a tmux window from a layout expression.\n\n"
+    "With no layout, the window's current one is opened in $EDITOR.\n\n"
     "Examples:\n\n"
+    "  lay                  edit the current layout in $EDITOR\n\n"
     "  lay '1 1 1'          three equal columns\n\n"
     "  lay '(4 4) / 1'      two columns above one full-width pane\n\n"
     "  lay '3:(1 / 1) 1'    a tall stacked column at 75%, sidebar at 25%",
@@ -170,13 +166,11 @@ def run(
               help="Split to create missing panes instead of failing.")
 @click.option("-n", "--dry-run", is_flag=True,
               help="Print an ASCII diagram of the layout without applying it.")
-@click.option("-e", "--edit", is_flag=True,
-              help="Edit the window's current layout in $EDITOR.")
 @click.option("-v", "--verbose", is_flag=True,
               help="Report the parsed tree and the computed cell geometry.")
 @click.version_option(__version__, "-V", "--version", prog_name="lay")
-def cli(words, target, create, dry_run, edit, verbose):
-    raise SystemExit(run(words, target, create, dry_run, edit, verbose))
+def cli(words, target, create, dry_run, verbose):
+    raise SystemExit(run(words, target, create, dry_run, verbose))
 
 
 def main() -> None:
