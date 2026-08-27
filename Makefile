@@ -26,7 +26,7 @@ dev:
 test: dev
 	uv run ruff check
 	uv run pyright
-	uv run pytest -q
+	uv run pytest
 
 lint: dev
 	uv run python -m compileall -q src

@@ -45,10 +45,16 @@ def normalise(layout: str) -> str:
 class TmuxFixture:
     def __init__(self, socket: str):
         self.socket = socket
+        # Filled in once the server is up; see the tmux_process fixture.
+        self.socket_path = ""
 
     def tmux(self, *args: str) -> str:
+        # -f /dev/null keeps the developer's ~/.tmux.conf out of the picture.
+        # No test is known to fail without it, but options such as
+        # main-pane-width do alter the layout strings compared here, so the
+        # server starts bare rather than relying on that staying true.
         result = subprocess.run(
-            ["tmux", "-L", self.socket, *args],
+            ["tmux", "-L", self.socket, "-f", "/dev/null", *args],
             capture_output=True,
             text=True,
             check=False,
@@ -84,19 +90,37 @@ class TmuxFixture:
         return self.tmux("display-message", "-p", "#{pane_id}")
 
 
-@pytest.fixture
-def tmux_server(monkeypatch):
+@pytest.fixture(scope="session")
+def tmux_process():
+    """One tmux server for the whole session.
+
+    Starting a server per test cost far more than the tests themselves: each
+    start forks a daemon and (before -f /dev/null) sourced the user's config.
+    Every test already opens with ``tmux_server.reset()``, which trims the
+    window back to a single pane, so one server is enough to keep them apart.
+    """
     socket = f"laytest-{uuid.uuid4().hex[:8]}"
     fixture = TmuxFixture(socket)
     fixture.tmux(
         "new-session", "-d", "-x", str(WIDTH), "-y", str(HEIGHT), "-s", "t"
     )
-    socket_path = fixture.tmux("display-message", "-p", "#{socket_path}")
-    monkeypatch.setenv("TMUX", f"{socket_path},0,0")
+    fixture.socket_path = fixture.tmux("display-message", "-p", "#{socket_path}")
     try:
         yield fixture
     finally:
         fixture.tmux("kill-server")
+
+
+@pytest.fixture
+def tmux_server(tmux_process, monkeypatch):
+    """The shared server, with $TMUX pointed at it for this test only.
+
+    The env var stays function-scoped on purpose: test_cli.py deletes TMUX to
+    check the outside-tmux paths, and test_parser.py sorts after this module.
+    Neither should inherit a live server from a session-scoped setenv.
+    """
+    monkeypatch.setenv("TMUX", f"{tmux_process.socket_path},0,0")
+    return tmux_process
 
 
 def invoke(args: list[str]) -> int:
