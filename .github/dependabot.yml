@@ -1,0 +1,24 @@
+version: 2
+
+updates:
+  # Keeps the action refs in .github/workflows current. setup-uv publishes no
+  # floating major tag, so it is pinned to an exact version and will otherwise
+  # never pick up patch fixes.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # click, libtmux and the dev tools, via uv.lock. CI validates every bump.
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns:
+          - "*"
