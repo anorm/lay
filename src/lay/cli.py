@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import sys
-from importlib.metadata import PackageNotFoundError, version as _version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _version
 
 import click
 
 from . import diagram as diagram_mod
 from . import editor, geometry, tmux
 from .decode import decode as decode_layout
-from .parser import AXIS_NAMES, LayError, ParseError, parse
+from .parser import AXIS_NAMES, LayError, Node, ParseError, parse
 
 try:
     __version__ = _version("lay")
@@ -41,6 +42,7 @@ def _describe_cells(cell: geometry.Cell, depth: int = 0, counter=None) -> list[s
         line = f"{field}pane {counter[0]}"
         counter[0] += 1
         return [line]
+    assert cell.axis is not None  # a cell with children is always a split
     lines = [f"{field}{AXIS_NAMES[cell.axis]}"]
     for child in cell.children:
         lines.extend(_describe_cells(child, depth + 1, counter))
@@ -61,7 +63,7 @@ def _report(window, tree, cell: geometry.Cell) -> None:
         click.echo(line, err=True)
 
 
-def _parse_or_report(source: str):
+def _parse_or_report(source: str) -> tuple[Node | None, int]:
     """Parse ``source``, reporting any error. Returns ``(tree, exit_code)``."""
     try:
         return parse(source), 0
@@ -82,11 +84,10 @@ def run(
 ) -> int:
     source = " ".join(words).strip()
 
-    # No layout means edit the window's current one in $EDITOR.
-    edit = not source
-
-    tree = None
-    if not edit:
+    # No layout means edit the window's current one in $EDITOR; that is
+    # deferred until the window has been measured, so ``tree`` stays None.
+    tree: Node | None = None
+    if source:
         tree, code = _parse_or_report(source)
         if tree is None:
             return code
@@ -96,7 +97,7 @@ def run(
         # A dry run reads the window size and nothing else.
         window = tmux.measure(server, target)
 
-        if edit:
+        if tree is None:
             current = decode_layout(tmux.current_layout(server, window))
             if verbose:
                 click.echo(f"current: {current}", err=True)

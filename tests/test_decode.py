@@ -7,7 +7,6 @@ import pytest
 from lay.decode import (
     DecodeError,
     decode,
-    parse_layout_string,
     recover_weights,
     to_expression,
 )

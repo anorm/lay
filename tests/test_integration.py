@@ -51,6 +51,7 @@ class TmuxFixture:
             ["tmux", "-L", self.socket, *args],
             capture_output=True,
             text=True,
+            check=False,
         )
         return result.stdout.strip()
 

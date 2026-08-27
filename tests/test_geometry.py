@@ -1,6 +1,6 @@
 import pytest
 
-from lay.geometry import COLS, ROWS, FitError, build, checksum, distribute, render
+from lay.geometry import COLS, FitError, build, checksum, distribute, render
 from lay.parser import parse
 
 

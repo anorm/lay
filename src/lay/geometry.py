@@ -7,6 +7,7 @@ children share ``L - (n - 1)`` cells between them.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from .parser import COLS, ROWS, LayError, Leaf, Node, Split
@@ -27,7 +28,7 @@ class Cell:
     y: int
     width: int
     height: int
-    children: list["Cell"] = field(default_factory=list)
+    children: list[Cell] = field(default_factory=list)
 
     @property
     def is_leaf(self) -> bool:
@@ -37,7 +38,7 @@ class Cell:
     def axis(self) -> str | None:
         return self.node.axis if isinstance(self.node, Split) else None
 
-    def leaves(self) -> list["Cell"]:
+    def leaves(self) -> list[Cell]:
         """Return the leaf cells in depth-first, written order."""
         if self.is_leaf:
             return [self]
@@ -52,7 +53,7 @@ class Cell:
             yield from child.walk()
 
 
-def distribute(total: int, weights: list[float]) -> list[int]:
+def distribute(total: int, weights: Sequence[float]) -> list[int]:
     """Split ``total`` cells between ``weights``, largest remainder first.
 
     Ties are broken in favour of the earlier sibling, which is what tmux
@@ -141,6 +142,7 @@ def _render(cell: Cell, pane_ids: list[str], counter: list[int]) -> str:
         index = counter[0]
         counter[0] += 1
         return f"{prefix},{_pane_token(pane_ids, index)}"
+    assert cell.axis is not None  # a cell with children is always a split
     open_b, close_b = _BRACKETS[cell.axis]
     inner = ",".join(_render(child, pane_ids, counter) for child in cell.children)
     return f"{prefix}{open_b}{inner}{close_b}"

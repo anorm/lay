@@ -58,6 +58,10 @@ class Node:
     def leaf_count(self) -> int:
         raise NotImplementedError
 
+    def describe(self) -> str:
+        """Return a human readable rendering of the subtree."""
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
 class Leaf(Node):

@@ -14,6 +14,7 @@ reproduce the observed sizes exactly when fed back through
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import reduce
 from math import gcd
@@ -42,7 +43,7 @@ class Box:
     axis: str | None  # None for a leaf
     width: int
     height: int
-    children: tuple["Box", ...] = ()
+    children: tuple[Box, ...] = ()
 
     @property
     def is_leaf(self) -> bool:
@@ -103,22 +104,23 @@ def parse_layout_string(layout: str) -> Box:
     return root
 
 
-def recover_weights(available: int, sizes: list[int]) -> list[int]:
+def recover_weights(available: int, sizes: Sequence[int]) -> list[int]:
     """Smallest integer weights that reproduce ``sizes`` exactly.
 
     Falls back to the sizes themselves, which are always an exact solution,
     so this never fails -- but a layout tmux built itself (a mouse drag, or
     ``select-layout tiled``) may genuinely have no simple ratio.
     """
+    target = list(sizes)
     for denominator in range(1, MAX_DENOMINATOR + 1):
         weights = [
-            max(1, round(size * denominator / available)) for size in sizes
+            max(1, round(size * denominator / available)) for size in target
         ]
         divisor = reduce(gcd, weights)
         weights = [weight // divisor for weight in weights]
-        if distribute(available, weights) == sizes:
+        if distribute(available, weights) == target:
             return weights
-    return list(sizes)
+    return target
 
 
 def _weigh(box: Box, weight: float) -> Node:

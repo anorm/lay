@@ -32,6 +32,7 @@ def test_adjacent_row_chains_stay_separate():
     # Each row chain ends where the next item begins, so no parentheses
     # are needed to put two stacked pairs side by side.
     tree = parse("1 / 1 1 / 1")
+    assert isinstance(tree, Split)
     assert tree.axis == COLS
     stack = Split(1.0, ROWS, (Leaf(1.0), Leaf(1.0)))
     assert tree.children == (stack, stack)
@@ -39,18 +40,22 @@ def test_adjacent_row_chains_stay_separate():
 
 def test_decimal_weights():
     tree = parse("0.5 2.5")
+    assert isinstance(tree, Split)
     assert [c.weight for c in tree.children] == [0.5, 2.5]
 
 
 def test_bare_group_has_weight_one_regardless_of_contents():
     tree = parse("(4 4) 1")
+    assert isinstance(tree, Split)
     assert tree.children[0].weight == 1.0
     assert tree.children[1].weight == 1.0
 
 
 def test_group_weight_prefix():
     tree = parse("3:(1 1) 1")
+    assert isinstance(tree, Split)
     group, sidebar = tree.children
+    assert isinstance(group, Split)
     assert group.weight == 3.0
     assert sidebar.weight == 1.0
     assert [c.weight for c in group.children] == [1.0, 1.0]
@@ -74,6 +79,7 @@ def test_nesting_is_not_flattened():
 
 def test_deep_nesting():
     tree = parse("1 / (1 (1 / 1 / 1)) / 1")
+    assert isinstance(tree, Split)
     assert tree.axis == ROWS
     # 1 + (1 + 3) + 1
     assert tree.leaf_count == 6
@@ -114,4 +120,5 @@ def test_error_carries_position():
     with pytest.raises(ParseError) as info:
         parse("1 1 & 1")
     assert info.value.pos == 4
-    assert "^" in info.value.caret()
+    caret = info.value.caret()
+    assert caret is not None and "^" in caret
