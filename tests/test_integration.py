@@ -165,24 +165,24 @@ LAYOUTS = [
 
 @pytest.mark.parametrize("layout", LAYOUTS)
 def test_applied_layout_is_byte_identical_to_what_lay_renders(tmux_server, layout):
-    """Our layout string must match tmux's own dump exactly, checksum included."""
+    """Our layout string must match tmux's own dump exactly, checksum included.
+
+    The geometry is asserted first so a failure says which layer broke: wrong
+    rectangles, or the right ones carrying the wrong ids or checksum. That
+    ordering is why no separate round-trip test is needed -- normalise()
+    renumbers pane ids to the same ordinals render() emits without them, so a
+    normalised comparison cannot fail once the byte-exact one passes.
+    """
     tmux_server.reset()
     assert invoke([layout]) == 0
 
     applied = tmux_server.layout
+    cell = build(parse(layout), WIDTH, HEIGHT)
+
+    assert normalise(applied) == normalise(render(cell))
+
     pane_ids = tmux_server.tmux("list-panes", "-F", "#{pane_id}").splitlines()
-    rendered = render(build(parse(layout), WIDTH, HEIGHT), pane_ids)
-
-    assert rendered == applied
-
-
-@pytest.mark.parametrize("layout", LAYOUTS)
-def test_applied_geometry_survives_a_round_trip(tmux_server, layout):
-    """Whatever tmux reports back must describe the geometry we asked for."""
-    tmux_server.reset()
-    assert invoke([layout]) == 0
-    expected = render(build(parse(layout), WIDTH, HEIGHT))
-    assert normalise(tmux_server.layout) == normalise(expected)
+    assert render(cell, pane_ids) == applied
 
 
 def test_surplus_panes_exit_2(tmux_server, capsys):
