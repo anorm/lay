@@ -109,6 +109,16 @@ def load_panes(server: Server, window: Window) -> Window:
     )
 
 
+def active_pane(server: Server, window: Window) -> str:
+    """Return the id of the pane that is currently active in ``window``."""
+    lines = _run(
+        server, "display-message", "-p", "-t", window.target, "#{pane_id}"
+    )
+    if not lines or not lines[0].strip():
+        raise TmuxError("could not read the active pane")
+    return lines[0].strip()
+
+
 def current_layout(server: Server, window: Window) -> str:
     """Read the window's current tmux layout string.
 
@@ -124,11 +134,18 @@ def current_layout(server: Server, window: Window) -> str:
 
 
 def create_panes(server: Server, window: Window, needed: int) -> Window:
-    """Split ``needed`` extra panes into the window, keeping room as we go."""
+    """Split ``needed`` extra panes into the window, keeping room as we go.
+
+    ``split-window`` focuses whatever it just made, so the pane the user was
+    working in is noted first and selected again once the splitting is done.
+    Filling out a layout must not move them somewhere else.
+    """
+    focused = active_pane(server, window)
     for _ in range(needed):
         _run(server, "split-window", "-t", window.target)
         # Re-tile between splits, otherwise tmux runs out of room to divide.
         _run(server, "select-layout", "-t", window.target, "tiled")
+    _run(server, "select-pane", "-t", focused)
     return load_panes(server, window)
 
 

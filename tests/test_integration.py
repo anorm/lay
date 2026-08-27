@@ -79,6 +79,10 @@ class TmuxFixture:
     def pane_count(self) -> int:
         return len(self.tmux("list-panes", "-F", "#{pane_id}").splitlines())
 
+    @property
+    def active_pane(self) -> str:
+        return self.tmux("display-message", "-p", "#{pane_id}")
+
 
 @pytest.fixture
 def tmux_server(monkeypatch):
@@ -271,6 +275,40 @@ def test_nth_leaf_gets_nth_pane(tmux_server):
     assert geom[0][1] < geom[1][1]              # 0 above 1
     assert geom[2][0] > 0                       # 2 is on the right
     assert geom[2][2] > geom[0][2]              # and is the wider one
+
+
+def test_creating_panes_keeps_the_active_pane(tmux_server):
+    """Splitting in the panes a layout needs must not steal the focus."""
+    tmux_server.reset()
+    before = tmux_server.active_pane
+    assert invoke(["1 1 1"]) == 0
+    assert tmux_server.pane_count == 3
+    assert tmux_server.active_pane == before
+
+
+def test_creating_panes_keeps_the_active_pane_when_it_is_not_the_first(
+    tmux_server,
+):
+    """The remembered pane is the active one, not simply pane 0."""
+    tmux_server.reset()
+    assert invoke(["1 1"]) == 0
+    panes = tmux_server.tmux("list-panes", "-F", "#{pane_id}").splitlines()
+    tmux_server.tmux("select-pane", "-t", panes[1])
+    assert tmux_server.active_pane == panes[1]
+
+    assert invoke(["1 1 1 1"]) == 0
+    assert tmux_server.pane_count == 4
+    assert tmux_server.active_pane == panes[1]
+
+
+def test_a_layout_that_creates_nothing_keeps_the_active_pane(tmux_server):
+    tmux_server.reset()
+    assert invoke(["1 1 1"]) == 0
+    panes = tmux_server.tmux("list-panes", "-F", "#{pane_id}").splitlines()
+    tmux_server.tmux("select-pane", "-t", panes[2])
+
+    assert invoke(["1 / 1 / 1"]) == 0
+    assert tmux_server.active_pane == panes[2]
 
 
 # --------------------------------------------------------------------------
